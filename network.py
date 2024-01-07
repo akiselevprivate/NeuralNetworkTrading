@@ -13,13 +13,13 @@ from data_creation import train_x1, train_x3, train_y, test_x1, test_x3, test_y,
 lsmt_model = Sequential(
     [
         Input(shape=train_x1.shape[1:]),
-        LSTM(128, return_sequences=True),
+        LSTM(200, return_sequences=True),
         Dropout(0.2),
         BatchNormalization(),
-        LSTM(128, return_sequences=True),
+        LSTM(200, return_sequences=True),
         Dropout(0.1),
         BatchNormalization(),
-        LSTM(128),
+        LSTM(200),
         Dropout(0.2),
         BatchNormalization(),
     ]
@@ -45,7 +45,8 @@ other_features_model = Sequential([Input(shape=train_x3.shape[1:])])
 concatenated_output = concatenate([lsmt_model.output, other_features_model.output])
 
 final_layers = [
-    Dense(64, activation="relu"),
+    Dense(128),
+    Dense(64),
     Dense(32, activation="relu"),
     Dense(2, activation="softmax"),
 ]
@@ -65,14 +66,13 @@ print(model.summary())
 
 tensorboard_callback = TensorBoard(log_dir=f"logs/{NAME}", histogram_freq=1)
 
-# # Create a ModelCheckpoint callback to save the best weights during training
-# checkpoint_callback = ModelCheckpoint(
-#     filepath=r"checkpoints",
-#     save_weights_only=True,
-#     monitor="val_accuracy",
-#     mode="max",
-#     save_best_only=True,
-# )
+# Create a ModelCheckpoint callback to save the best weights during training
+checkpoint_callback = ModelCheckpoint(
+    filepath=f"checkpoints/{NAME}.model.keras",
+    monitor="val_accuracy",
+    mode="max",
+    save_best_only=True,
+)
 
 # Compile the model
 model.compile(
@@ -85,7 +85,7 @@ model.fit(
     train_y,
     epochs=11,
     validation_data=([test_x1, test_x3], test_y),
-    callbacks=[tensorboard_callback],
+    callbacks=[tensorboard_callback, checkpoint_callback],
     batch_size=64,
 )
 

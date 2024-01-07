@@ -110,11 +110,11 @@ how diverce the news sentiment is
 
 stock (56%)
 
-stock+features 63.6% not finished training, val acc 54.7%, i thnk its overfitting cuz only 128 lstm nodes
+stock+features 63.6% not finished training, val acc 54.7%, i think its overfitting cuz only 128 lstm nodes
 
 stock+features 57% not finished, val acc 56%, 265 lstm
 
-stock+features 63% not finished, val acc 56%, 128 lstm
+stock+features 63% not finished, val acc 56%, 128 lstm, overfitting
 
 stock+features 58% not finished, val acc 58%, 128 lstm, 20 epochs (11 is best)
 

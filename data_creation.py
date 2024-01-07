@@ -10,8 +10,6 @@ pd.set_option("display.float_format", lambda x: "%.0f" % x)
 
 
 stock_csv_path = r"data/stock/min_2018.csv"
-combined_data_csv_path = r"data/combined/Bitcoin.csv"
-combined_scaled_data_csv_path = r"data/combined/BTC_scaled.csv"
 
 
 FUTURE_PERIOD_PREDICT = 3
@@ -86,8 +84,6 @@ df.drop(
 
 df.dropna(inplace=True)
 
-df.to_csv(combined_data_csv_path, index=False)
-
 
 # DATA CREATION END
 
@@ -122,7 +118,6 @@ def preprocess_df(sub_df, pct_change, scalers: dict, val=False, balance=True):
         if col in pct_change:
             sub_df[col] = sub_df[col].pct_change()
         sub_df.dropna(inplace=True)
-        sub_df[col].to_csv(combined_scaled_data_csv_path)
         column_data = sub_df[col].values.reshape(-1, 1)
         if not val:
             scaler = scaler.fit(column_data)
