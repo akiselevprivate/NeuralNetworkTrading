@@ -83,7 +83,7 @@ model.compile(
 model.fit(
     [train_x1, train_x3],
     train_y,
-    epochs=10,
+    epochs=11,
     validation_data=([test_x1, test_x3], test_y),
     callbacks=[tensorboard_callback],
     batch_size=64,

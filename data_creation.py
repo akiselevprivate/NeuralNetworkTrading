@@ -9,17 +9,21 @@ from collections import deque
 pd.set_option("display.float_format", lambda x: "%.0f" % x)
 
 
-stock_csv_path = r"data/stock/BTC-USD1.csv"
+stock_csv_path = r"data/stock/min_2018.csv"
 combined_data_csv_path = r"data/combined/Bitcoin.csv"
 combined_scaled_data_csv_path = r"data/combined/BTC_scaled.csv"
 
-FUTURE_PERIOD_PREDICT = 1
+
+FUTURE_PERIOD_PREDICT = 3
 SEQ_LEN = 60
 NAME = f"{SEQ_LEN}-SEQ-{FUTURE_PERIOD_PREDICT}-PRED-{int(time.time())}"
 
-
 df = pd.read_csv(stock_csv_path)
-df["Date"] = pd.to_datetime(df["Date"], unit="s")
+
+df = df[["timestamp", "Open", "High", "Low", "Close", "Volume"]]
+
+
+df["Date"] = pd.to_datetime(df["timestamp"], unit="s")
 
 df.ffill(inplace=True)
 # df = df.drop("Adj Close", axis=1)
@@ -188,7 +192,7 @@ df.drop(
 )
 
 times = sorted(df.index.values)
-last_5pct = sorted(df.index.values)[-int(0.02 * len(times))]
+last_5pct = sorted(df.index.values)[-int(0.05 * len(times))]
 
 train_df = df[(df.index < last_5pct)]
 test_df = df[(df.index >= last_5pct)]
