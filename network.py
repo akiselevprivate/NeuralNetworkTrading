@@ -1,8 +1,16 @@
 import tensorflow as tf
 from tensorflow import keras
 from keras.models import Sequential, Model
-from keras.layers import Dense, LSTM, Input, concatenate, Dropout, BatchNormalization
-from keras.callbacks import TensorBoard, ModelCheckpoint
+from keras.layers import (
+    Dense,
+    LSTM,
+    Input,
+    concatenate,
+    Dropout,
+    BatchNormalization,
+)
+from keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping
+import keras.backend as K
 
 
 # from input_data import train_X1, test_X1, train_X2, test_X2, test_Y, train_Y
@@ -13,13 +21,13 @@ from data_creation import train_x1, train_x3, train_y, test_x1, test_x3, test_y,
 lsmt_model = Sequential(
     [
         Input(shape=train_x1.shape[1:]),
-        LSTM(200, return_sequences=True),
+        LSTM(150, return_sequences=True),
         Dropout(0.2),
         BatchNormalization(),
-        LSTM(200, return_sequences=True),
+        LSTM(150, return_sequences=True),
         Dropout(0.1),
         BatchNormalization(),
-        LSTM(200),
+        LSTM(150),
         Dropout(0.2),
         BatchNormalization(),
     ]
@@ -39,14 +47,13 @@ lsmt_model = Sequential(
 # )
 
 
-other_features_model = Sequential([Input(shape=train_x3.shape[1:])])
+other_features_model = Sequential([Input(shape=train_x3.shape[1:]), Dense(10)])
 
 
 concatenated_output = concatenate([lsmt_model.output, other_features_model.output])
 
 final_layers = [
-    Dense(128),
-    Dense(64),
+    Dense(64, activation="relu"),
     Dense(32, activation="relu"),
     Dense(2, activation="softmax"),
 ]
@@ -63,8 +70,22 @@ model = Model(
 
 print(model.summary())
 
+with open(f"model_structure/{NAME}.json", "w+") as f:
+    f.write(model.to_json())
 
-tensorboard_callback = TensorBoard(log_dir=f"logs/{NAME}", histogram_freq=1)
+
+def myprint(s):
+    with open(f"model_structure/{NAME}.txt", "a+") as f:
+        print(s, file=f)
+
+
+model.summary(print_fn=myprint)
+
+
+tensorboard_callback = TensorBoard(
+    log_dir=f"logs/{NAME}",
+    histogram_freq=1,
+)
 
 # Create a ModelCheckpoint callback to save the best weights during training
 checkpoint_callback = ModelCheckpoint(
@@ -74,20 +95,52 @@ checkpoint_callback = ModelCheckpoint(
     save_best_only=True,
 )
 
+early_stopping = EarlyStopping(
+    patience=3, monitor="val_loss", mode="auto", restore_best_weights=True
+)
+
+
+def recall_m(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    recall = true_positives / (possible_positives + K.epsilon())
+    return recall
+
+
+def precision_m(y_true, y_pred):
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+    precision = true_positives / (predicted_positives + K.epsilon())
+    return precision
+
+
+def f1_m(y_true, y_pred):
+    precision = precision_m(y_true, y_pred)
+    recall = recall_m(y_true, y_pred)
+    return 2 * ((precision * recall) / (precision + recall + K.epsilon()))
+
+
 # Compile the model
 model.compile(
-    optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"]
+    optimizer="adam",
+    loss="sparse_categorical_crossentropy",
+    metrics=["accuracy", precision_m, f1_m],
 )
+
 
 # Train the model
 model.fit(
     [train_x1, train_x3],
     train_y,
-    epochs=11,
+    epochs=40,
     validation_data=([test_x1, test_x3], test_y),
-    callbacks=[tensorboard_callback, checkpoint_callback],
+    callbacks=[tensorboard_callback, checkpoint_callback, early_stopping],
     batch_size=64,
 )
+
+model.save(f"models/{NAME}.keras")
+
+print(f"Finished training model {NAME}. Model saved.")
 
 
 # # Predict on new data (adjust 'new_data' accordingly)

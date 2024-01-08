@@ -106,6 +106,11 @@ maybe add high/low features
 
 how diverce the news sentiment is
 
+Accuracy is used when the True Positives and True negatives are more important
+F1-score is used when the False Negatives and False Positives are crucial
+Precision: It is implied as the measure of the correctly identified positive cases from all the predicted positive cases. Thus, it is useful when the costs of False Positives is high.
+Recall: It is the measure of the correctly identified positive cases from all the actual positive cases. It is important when the cost of False Negatives is high.
+
 # Results
 
 stock (56%)
@@ -120,6 +125,10 @@ stock+features 58% not finished, val acc 58%, 128 lstm, 20 epochs (11 is best)
 
 stock+features 57% loss, val acc 55% stalled at the end 11 epochs, 128 nodes
 
+stock+features 50%, val acc 50%, weird results, 200 nodes, 9h train time, maybe because relu?
+
+stock+features 57%, val acc 56%, 150 nodes, happy with results, 1h 15m to train on gpu
+
 # Input Data
 
 - General Twitter news
@@ -127,6 +136,6 @@ stock+features 57% loss, val acc 55% stalled at the end 11 epochs, 128 nodes
 - General Reddit news
 - General Twitter Crypto-currecy news
 - General Reddit Crypto-currecy news
-- Time series data
 - Date, Time
 - Interest, GDP, Inflation (previous and current)
+- Stock + Technical Indicators (minute, hour, day)
