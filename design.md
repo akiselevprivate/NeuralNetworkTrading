@@ -129,6 +129,10 @@ stock+features 50%, val acc 50%, weird results, 200 nodes, 9h train time, maybe 
 
 stock+features 57%, val acc 56%, 150 nodes, happy with results, 1h 15m to train on gpu
 
+stock+features 56%, 56%
+
+daily stock+features 
+
 # Input Data
 
 - General Twitter news

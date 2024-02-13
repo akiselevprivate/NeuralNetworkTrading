@@ -6,3 +6,4 @@ data
 models
 model_structure
 data.pkl
+.DS_Store

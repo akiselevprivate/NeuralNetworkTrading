@@ -6,24 +6,42 @@ from collections import deque
 import gc
 import pickle
 
+import warnings
+from pandas.errors import SettingWithCopyWarning
 
-pd.set_option("display.float_format", lambda x: "%.0f" % x)
+warnings.simplefilter(action="ignore", category=(SettingWithCopyWarning))
+
+
+pd.set_option("display.float_format", lambda x: "%.2f" % x)
 
 
 stock_csv_path = r"data/stock/min_2018.csv"
+FUTURE_SHIFT = 1
+Y_COL = "Future_60_STEP"
 
 
-df = pd.read_csv(stock_csv_path)
+main_df = pd.read_csv(
+    stock_csv_path,
+    usecols=["timestamp", "Open", "High", "Low", "Close", "Volume"],
+    dtype={
+        "timestamp": int,
+        "Open": float,
+        "Close": float,
+        "High": float,
+        "Low": float,
+        "Volume": float,
+    },
+)
 
-df = df[["timestamp", "Open", "High", "Low", "Close", "Volume"]]
 
+main_df["Date"] = pd.to_datetime(main_df["timestamp"], unit="s")
 
-df["Date"] = pd.to_datetime(df["timestamp"], unit="s")
+main_df.drop("timestamp", axis=1, inplace=True)
 
-df.drop("timestamp", axis=1, inplace=True)
+main_df.ffill(inplace=True)
+# main_df = main_df.drop("Adj Close", axis=1)
 
-df.ffill(inplace=True)
-# df = df.drop("Adj Close", axis=1)
+# main_df = main_df.head(int(len(df) * 0.3))
 
 
 def create_features(df, only_technical_indicators=False):
@@ -81,7 +99,7 @@ def create_features(df, only_technical_indicators=False):
             inplace=True,
         )
 
-    df["Future"] = df["Close"].shift(-1) > df["Close"]
+    df["Future"] = df["Close"].shift(-FUTURE_SHIFT) > df["Close"]
     df["Future"] = df["Future"].astype(int)
 
     df.dropna(inplace=True)
@@ -143,7 +161,7 @@ def preprocess_df(sub_df, scalers: dict, val=False, balance=True):
         sub_df[input1_columns].values,
         sub_df[input3_columns].values,
         sub_df[input4_columns].values,
-        sub_df["Future_60_STEP"].values,
+        sub_df[Y_COL].values,
     ):  # iterate over the values
         prev_mins.append(i1)
         prev_hours.append(i2)
@@ -168,16 +186,11 @@ def preprocess_df(sub_df, scalers: dict, val=False, balance=True):
         buys = buys[:min_len]
         sells = sells[:min_len]
 
-        print("split buys and sells")
-        print(min_len)
-
         sequential_data = buys + sells
 
     np.random.shuffle(sequential_data)
 
     X1, X2, X3, X4, Y = zip(*sequential_data)
-
-    del sequential_data
 
     X1 = np.array(X1)
     X2 = np.array(X2)
@@ -192,7 +205,7 @@ def preprocess_df(sub_df, scalers: dict, val=False, balance=True):
 def add_pct_change(df, percent_change_scale):
     for col in percent_change_scale:
         df[col] = df[col].pct_change()
-        df.dropna(inplace=True)
+    df.dropna(inplace=True)
     return df
 
 
@@ -203,10 +216,16 @@ def create_window_dfs(
     for i in range(window_size):
         new_df = df.shift(-i).iloc[::window_size, :]
         new_features_df = add_pct_change(
-            create_features(new_df, only_technical_indicators), percent_change_scale
+            create_features(
+                new_df, only_technical_indicators=only_technical_indicators
+            ),
+            percent_change_scale,
         )
-        dfs.append(new_features_df)
-    return pd.concat(dfs, axis=0)
+        dfs.append(new_features_df.set_index("Date"))
+        print(f"{i+1}/{window_size}")
+    result = pd.concat(dfs, axis=0)
+    result.sort_index(inplace=True)
+    return result
 
 
 def create_inputs(df):
@@ -218,6 +237,7 @@ def create_inputs(df):
 
     percent_change_scale = ["Close", "MA10", "MA20", "MA30", "Volume"]
 
+    print("computing minute df")
     minute_df = add_pct_change(create_features(df.copy()), percent_change_scale)
     minute_df.drop(
         drop_cols,
@@ -225,6 +245,7 @@ def create_inputs(df):
         inplace=True,
     )
 
+    print("computing hour df")
     hour_df = create_window_dfs(
         df.copy(), 60, percent_change_scale, only_technical_indicators=True
     )
@@ -233,8 +254,10 @@ def create_inputs(df):
         axis=1,
         inplace=True,
     )
+    hour_df.reset_index(inplace=True)
     hour_df = hour_df.add_suffix("_60_STEP")
 
+    print("computing day df")
     day_df = create_window_dfs(
         df.copy(), 1440, percent_change_scale, only_technical_indicators=True
     )
@@ -243,6 +266,7 @@ def create_inputs(df):
         axis=1,
         inplace=True,
     )
+    day_df.reset_index(inplace=True)
     day_df = day_df.add_suffix("_1440_STEP")
 
     # print(minute_df.head())
@@ -274,8 +298,9 @@ def create_inputs(df):
 
     # print(df.head())
 
-    times = sorted(df.index.values)
-    last_5pct = sorted(df.index.values)[-int(0.05 * len(times))]
+    df.reset_index(inplace=True)
+
+    last_5pct = sorted(df.index.values)[-int(0.05 * len(df.index.values))]
 
     train_df = df[(df.index < last_5pct)]
     test_df = df[(df.index >= last_5pct)]
@@ -308,7 +333,9 @@ def create_inputs(df):
     for i in to_scale:
         scalers[i] = StandardScaler()
 
+    print("preprocessing train df")
     train_x1, train_x2, train_x3, train_x4, train_y = preprocess_df(train_df, scalers)
+    print("preprocessing test df")
     test_x1, test_x2, test_x3, test_x4, test_y = preprocess_df(
         test_df, scalers, val=True
     )
@@ -338,7 +365,7 @@ def create_inputs(df):
     test_x3,
     test_x4,
     test_y,
-) = create_inputs(create_features(df))
+) = create_inputs(main_df)
 
 
 print(
@@ -350,8 +377,10 @@ print(
 )
 
 
-del df
+del main_df
 gc.collect()
+
+print("saving data to file")
 
 all_arrays = [
     train_x1,
